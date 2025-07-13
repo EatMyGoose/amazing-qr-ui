@@ -1,7 +1,7 @@
 from amzqr import amzqr
 import os
-from io import FileIO, BytesIO
-import udf
+from io import BytesIO
+import udt
 from tempfile import TemporaryDirectory
 from typing import Tuple
 from loguru import logger
@@ -13,8 +13,8 @@ def get_filename(path:str) -> str:
 def generate_qr(
     payload: str,
     size: int,
-    redundancy: udf.QRRedundancy,
-    image: FileIO | None,
+    redundancy: udt.QRRedundancy,
+    image: BytesIO | None,
     color: bool,
     contrast: float,
     brightness: float
