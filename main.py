@@ -2,7 +2,7 @@ import streamlit as st
 from qr_generator import generate_qr
 import udt
 from typing import get_args
-from image_preprocessor import preprocess_image
+from image_preprocessor import preprocess_image, get_gif_frame_interval_ms, add_frame_interval_and_loop_to_gif
 
 def init_state(key: str, value: any) -> None:
     if key not in st.session_state:
@@ -23,7 +23,7 @@ init_state("upload-image", None)
 init_state("slider-size", 5)
 
 st.set_page_config(
-    page_title="Pwetty QRs", 
+    page_title="QR Generator", 
     page_icon=":material/qr_code:", 
     layout="wide",
     menu_items={
@@ -59,8 +59,10 @@ with control_col:
     input_image = (
         preprocess_image(image, resize, replace_transparency) 
         if (image is not None) 
-        else image
+        else None
     )
+
+    gif_frame_interval_ms: int | None = get_gif_frame_interval_ms(image)
 
     qr_code, qr_code_filename = generate_qr(
         payload,
@@ -71,6 +73,8 @@ with control_col:
         contrast,
         brightness
     )
+
+    qr_code = add_frame_interval_and_loop_to_gif(qr_code, gif_frame_interval_ms)
 
 with preview_col:
     st.download_button("Download QR Code", qr_code, file_name=qr_code_filename, use_container_width=True, icon=":material/download:", help="Download QR code")

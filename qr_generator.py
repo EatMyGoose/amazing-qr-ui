@@ -46,8 +46,10 @@ def generate_qr(
         logger.info(f"QR Code written to <{output_path}>")
 
         with open(output_path, "rb") as output_file:
+            filename: str = get_filename(output_path)
             output_file.seek(0)
             copy = BytesIO(output_file.read())
+            copy.name = filename
             copy.seek(0)
 
-            return (copy, get_filename(output_path))
+            return (copy, filename)

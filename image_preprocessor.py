@@ -1,16 +1,22 @@
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageSequence
 from typing import Callable
 from loguru import logger
+import os
 
-def remove_alpha(input: BytesIO) -> BytesIO:
+def get_lowercase_extension(path: str) -> str:
+    _, ext = os.path.splitext(path)
+    return ext.lower()
+
+def has_gif_extension(path: str) -> str:
+    return  get_lowercase_extension(path) == ".gif"
+
+def remove_alpha(src_image: Image) -> Image:
     logger.info("[Operation] Removing Alpha")
-    input.seek(0)
-    src_image = Image.open(input)
 
     if not src_image.has_transparency_data:
         logger.info("Image has no alpha channel")
-        return input
+        return src_image
     
     # Sanitise alpha channel
     rgba_src_image = src_image.convert("RGBA")
@@ -18,16 +24,10 @@ def remove_alpha(input: BytesIO) -> BytesIO:
     white_canvas = Image.new("RGBA", rgba_src_image.size, (255,255,255, 255))
     white_canvas.paste(rgba_src_image, (0,0), mask=rgba_src_image) 
 
-    output_image_buffer = BytesIO()
-    output_image_buffer.name = input.name
-    white_canvas.save(output_image_buffer)
-    output_image_buffer.seek(0)
-    return output_image_buffer
+    return white_canvas
 
-def square_pad(input: BytesIO) -> BytesIO:
+def square_pad(src_image: Image) -> BytesIO:
     logger.info("[Operation] Padding image")
-    input.seek(0)
-    src_image = Image.open(input)
 
     width, height = src_image.size
     larger_dimension = max(width, height)
@@ -46,19 +46,31 @@ def square_pad(input: BytesIO) -> BytesIO:
         )
     )
 
-    output_image_buffer = BytesIO()
-    output_image_buffer.name = input.name
+    return square_canvas
 
-    square_canvas.save(output_image_buffer)
-    output_image_buffer.seek(0)
-    return output_image_buffer
+def preprocess_gif(
+    src_image: Image.Image,
+    frame_pipeline: list[Callable[[BytesIO], BytesIO]],    
+    output_image_name: str
+) -> BytesIO:
+    processed_frames = ImageSequence.all_frames(
+        src_image,
+        frame_pipeline
+    )
+
+    frame_interval_ms = src_image.info.get("duration")
+    gif_image_buffer = BytesIO()
+    gif_image_buffer.name = output_image_name
+    processed_frames[0].save(gif_image_buffer, save_all=True, append_images=processed_frames[1:], duration=frame_interval_ms, loop=0)
+    gif_image_buffer.seek(0)
+    return gif_image_buffer
 
 def preprocess_image(
-    src_image: BytesIO, 
+    src_image_buffer: BytesIO, 
     maintain_aspect_ratio: bool,
     replace_alpha: bool
 ) -> BytesIO:
-    pipeline: list[Callable[[BytesIO], BytesIO]] = []
+    pipeline: list[Callable[[Image.Image], Image.Image]] = []
 
     if maintain_aspect_ratio:
         pipeline.append(square_pad)
@@ -68,16 +80,54 @@ def preprocess_image(
 
     if len(pipeline) == 0:
         # no pre-processing needed
-        return src_image
+        return src_image_buffer
     
-    working_image = src_image
-    for operation in pipeline:
-        working_image = operation(working_image)
+    src_image = Image.open(src_image_buffer)
 
-    return working_image
+    def image_pipeline(working_image: Image.Image) -> Image.Image:
+        for operation in pipeline:
+            working_image = operation(working_image)
+        return working_image
 
+    is_gif_image: bool = has_gif_extension(src_image_buffer.name)
+    logger.info(f"<{src_image_buffer.name}>, is_gif_image: <{is_gif_image}>")
 
+    if is_gif_image:
+        return preprocess_gif(src_image, image_pipeline, src_image_buffer.name)
+    else:
+        processed_image = image_pipeline(src_image)
+        
+        processed_image_buffer = BytesIO()
+        processed_image_buffer.name = src_image_buffer.name
 
+        processed_image.save(processed_image_buffer)
 
+        processed_image_buffer.seek(0)
+        return processed_image_buffer
 
+def get_gif_frame_interval_ms(image_buffer: BytesIO | None) -> int | None:
+    if image_buffer is None or not has_gif_extension(image_buffer.name):
+        return None
+    else:
+        loaded_gif = Image.open(image_buffer)
+        interval_ms = loaded_gif.info.get("duration")
+        logger.info(f"<{image_buffer}> - frame interval(ms) = <{interval_ms}>")
+        return interval_ms
+
+def add_frame_interval_and_loop_to_gif(
+    image_buffer: BytesIO, 
+    frame_interval_ms: int) -> BytesIO:
+
+    logger.info(f"Adding frame interval of <{frame_interval_ms}ms> to <{image_buffer.name}> ")    
+
+    loaded_gif = Image.open(image_buffer)
+    gif_frames = ImageSequence.all_frames(loaded_gif)
+
+    gif_image_buffer = BytesIO()
+    gif_image_buffer.name = image_buffer.name
+    gif_frames[0].save(gif_image_buffer, save_all=True, append_images=gif_frames[1:], duration=frame_interval_ms, loop=0)
+    gif_image_buffer.seek(0)
+    return gif_image_buffer
+        
+    
 
