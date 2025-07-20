@@ -1,0 +1,6 @@
+services:
+  qr-ui:
+    build: ./
+    container_name: "qr-ui"
+    ports:
+    - 8501:8501

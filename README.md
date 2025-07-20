@@ -9,13 +9,20 @@
 ![image](docs/preview.gif)
 
 ## Installation
+### Docker
+- Ensure that **Docker Desktop** is installed and running
+- `git clone` the repository
+- Start the application via `docker compose up`
+- Access the application at `localhost:8501`
+- Stop the application via <kbd>Ctrl + C</kbd>
 
-### Pre-requisites
+### Direct-Installation
+#### Pre-requisites
 The following need to be installed:
 - `Python` (>=3.13)
 - `uv` (i.e. through `pip install uv`)
 
-### Setup
+#### Setup
 - `git clone` the repository
 - Within the repository, start the application via `uv run streamlit run main.py`
 - Access the application at `localhost:8501`
