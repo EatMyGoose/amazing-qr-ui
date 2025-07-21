@@ -4,3 +4,4 @@ docs
 .gitignore
 .git
 test_data
+Dockerfile
